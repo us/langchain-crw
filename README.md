@@ -14,28 +14,72 @@ pip install langchain-crw
 uv add langchain-crw
 ```
 
-You also need a CRW backend:
+## Setup — Pick One
+
+### Option A: Self-hosted (free)
+
+Run CRW on your own machine. No API key, no account, no limits.
 
 ```bash
-# Self-hosted (free)
+# Install CRW
 curl -fsSL https://raw.githubusercontent.com/us/crw/main/install.sh | bash
-crw  # starts on http://localhost:3000
 
-# Or use fastCRW cloud: https://fastcrw.com
+# Start the server (runs on http://localhost:3000)
+crw
+
+# Or use Docker
+docker run -p 3000:3000 ghcr.io/us/crw:latest
 ```
-
-## Quick Start
-
-### Scrape a single page
 
 ```python
 from langchain_crw import CrwLoader
 
+# No api_key needed — just works with localhost
+loader = CrwLoader(url="https://example.com", mode="scrape")
+docs = loader.load()
+print(docs[0].page_content)  # clean markdown
+```
+
+### Option B: Cloud ([fastcrw.com](https://fastcrw.com))
+
+No server to run. Get an API key from [fastcrw.com](https://fastcrw.com) and start scraping.
+
+```python
+from langchain_crw import CrwLoader
+
+loader = CrwLoader(
+    url="https://example.com",
+    api_url="https://fastcrw.com/api",
+    api_key="crw_live_...",  # get yours at fastcrw.com
+    mode="scrape",
+)
+docs = loader.load()
+print(docs[0].page_content)  # clean markdown
+```
+
+**Tip:** Set environment variables so you don't have to pass them every time:
+
+```bash
+export CRW_API_URL=https://fastcrw.com/api
+export CRW_API_KEY=crw_live_...
+```
+
+```python
+# With env vars set, no constructor args needed
+loader = CrwLoader(url="https://example.com")
+docs = loader.load()
+```
+
+## Usage
+
+### Scrape a single page
+
+```python
 loader = CrwLoader(url="https://example.com", mode="scrape")
 docs = loader.load()
 
 print(docs[0].page_content)    # clean markdown
-print(docs[0].metadata)        # title, sourceURL, statusCode
+print(docs[0].metadata)        # {'title': '...', 'sourceURL': '...', 'statusCode': 200}
 ```
 
 ### Crawl an entire site
@@ -57,13 +101,17 @@ loader = CrwLoader(url="https://example.com", mode="map")
 urls = [doc.page_content for doc in loader.load()]
 ```
 
-### Cloud mode (fastCRW)
+### Scrape with JS rendering
 
 ```python
 loader = CrwLoader(
-    url="https://example.com",
-    api_key="your-key",              # or set CRW_API_KEY env var
-    api_url="https://fastcrw.com/api",  # or set CRW_API_URL env var
+    url="https://spa-app.example.com",
+    mode="scrape",
+    params={
+        "render_js": True,
+        "wait_for": 3000,
+        "css_selector": "article.main-content",
+    },
 )
 docs = loader.load()
 ```
@@ -76,7 +124,7 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-# Crawl docs
+# Crawl docs (self-hosted or cloud — same code)
 loader = CrwLoader(url="https://docs.example.com", mode="crawl", params={"max_depth": 3, "max_pages": 50})
 docs = loader.load()
 
