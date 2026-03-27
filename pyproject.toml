@@ -1,0 +1,43 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "langchain-crw"
+version = "0.1.0"
+description = "LangChain integration for CRW — high-performance web scraping document loader"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [{ name = "CRW Project", email = "hello@fastcrw.com" }]
+keywords = ["langchain", "crw", "web-scraping", "document-loader", "rag"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "langchain-core>=0.3.0,<1.0.0",
+    "requests>=2.28.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/us/crw"
+Documentation = "https://fastcrw.com"
+Repository = "https://github.com/us/langchain-crw"
+Issues = "https://github.com/us/langchain-crw/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["langchain_crw"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
