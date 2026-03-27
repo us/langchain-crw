@@ -117,12 +117,14 @@ results = vectorstore.similarity_search("how to authenticate")
 
 ## Migrating from FireCrawlLoader
 
+`CrwLoader` supports the same `scrape`, `crawl`, and `map` modes. Note that `CrwLoader` defaults to `mode="scrape"` while `FireCrawlLoader` defaults to `mode="crawl"` — set the mode explicitly when migrating.
+
 ```python
 # Before
 from langchain_community.document_loaders import FireCrawlLoader
 loader = FireCrawlLoader(url="https://example.com", api_key="fc-...", mode="scrape")
 
-# After — same interface, self-hosted, no SDK needed
+# After — similar interface, self-hosted, no SDK needed
 from langchain_crw import CrwLoader
 loader = CrwLoader(url="https://example.com", mode="scrape")
 ```

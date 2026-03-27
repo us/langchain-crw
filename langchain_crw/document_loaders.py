@@ -1,4 +1,9 @@
-"""CRW document loader for LangChain."""
+"""CRW document loader for LangChain.
+
+Security note: Do not pass untrusted user input to ``url``, ``api_url``,
+``headers``, or ``proxy`` parameters. These are forwarded as HTTP requests
+and could be used for SSRF if exposed to untrusted input.
+"""
 
 from __future__ import annotations
 
@@ -9,6 +14,8 @@ from typing import Any, Iterator, Literal, Optional
 import requests
 from langchain_core.document_loaders import BaseLoader
 from langchain_core.documents import Document
+
+_DEFAULT_HTTP_TIMEOUT = 120  # seconds
 
 
 class CrwLoader(BaseLoader):
@@ -94,11 +101,11 @@ class CrwLoader(BaseLoader):
     def lazy_load(self) -> Iterator[Document]:
         """Lazy load documents from CRW."""
         if self.mode == "scrape":
-            return self._scrape()
+            yield from self._scrape()
         elif self.mode == "crawl":
-            return self._crawl()
+            yield from self._crawl()
         elif self.mode == "map":
-            return self._map()
+            yield from self._map()
         else:
             raise ValueError(
                 f"Invalid mode '{self.mode}'. Must be 'scrape', 'crawl', or 'map'."
@@ -130,8 +137,8 @@ class CrwLoader(BaseLoader):
                 f"CRW crawl did not return a job ID. Response: {start_response}"
             )
 
-        poll_interval = self.params.get("poll_interval", 2)
-        timeout = self.params.get("timeout", 300)
+        poll_interval = max(self.params.get("poll_interval", 2), 0.1)
+        timeout = max(self.params.get("timeout", 300), 0)
         elapsed = 0.0
 
         while elapsed < timeout:
@@ -143,12 +150,27 @@ class CrwLoader(BaseLoader):
                     doc = self._parse_document(page)
                     if doc.page_content:
                         yield doc
+                # Handle pagination if server returns next URL
+                next_url = status_response.get("next")
+                while next_url:
+                    next_resp = self._request("GET", "", _full_url=next_url)
+                    for page in next_resp.get("data", []):
+                        doc = self._parse_document(page)
+                        if doc.page_content:
+                            yield doc
+                    next_url = next_resp.get("next")
                 return
 
             if status == "failed":
                 raise RuntimeError(
                     f"CRW crawl job '{job_id}' failed. "
                     f"Response: {status_response}"
+                )
+
+            if status not in ("scraping", "queued", "waiting"):
+                raise RuntimeError(
+                    f"CRW crawl job '{job_id}' returned unexpected status "
+                    f"'{status}'. Response: {status_response}"
                 )
 
             time.sleep(poll_interval)
@@ -167,7 +189,7 @@ class CrwLoader(BaseLoader):
         # Links may be at top level or nested under "data"
         links = response.get("links") or response.get("data", {}).get("links", [])
         for link in links:
-            if link:
+            if isinstance(link, str) and link:
                 yield Document(page_content=link, metadata={})
 
     def _build_api_params(self) -> dict[str, Any]:
@@ -198,11 +220,17 @@ class CrwLoader(BaseLoader):
         return result
 
     def _request(
-        self, method: str, path: str, json: Optional[dict[str, Any]] = None
+        self,
+        method: str,
+        path: str,
+        json: Optional[dict[str, Any]] = None,
+        _full_url: Optional[str] = None,
     ) -> dict[str, Any]:
         """Make HTTP request to CRW API."""
-        url = f"{self.api_url}{path}"
-        response = self._session.request(method, url, json=json)
+        url = _full_url or f"{self.api_url}{path}"
+        response = self._session.request(
+            method, url, json=json, timeout=_DEFAULT_HTTP_TIMEOUT
+        )
         response.raise_for_status()
         return response.json()
 
@@ -216,5 +244,10 @@ class CrwLoader(BaseLoader):
             or page.get("plainText")
             or ""
         )
-        metadata = page.get("metadata", {})
+        # Ensure content is a string
+        if not isinstance(content, str):
+            content = str(content)
+        metadata = page.get("metadata") or {}
+        if not isinstance(metadata, dict):
+            metadata = {}
         return Document(page_content=content, metadata=metadata)
