@@ -22,7 +22,7 @@ def mock_session():
 class TestInit:
     def test_default_api_url(self, mock_session):
         loader = CrwLoader(url="https://example.com")
-        assert loader.api_url == "http://localhost:3000"
+        assert loader.api_url == "https://fastcrw.com/api"
 
     def test_custom_api_url(self, mock_session):
         loader = CrwLoader(url="https://example.com", api_url="https://fastcrw.com/api")
