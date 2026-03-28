@@ -20,43 +20,40 @@ uv add langchain-crw
 
 No server to install. [Sign up at fastcrw.com](https://fastcrw.com) and get **500 free credits** to start scraping:
 
+```bash
+export CRW_API_KEY=crw_live_...  # get yours at fastcrw.com
+```
+
 ```python
 from langchain_crw import CrwLoader
 
-loader = CrwLoader(
-    url="https://example.com",
-    api_url="https://fastcrw.com/api",
-    api_key="crw_live_...",  # get yours at fastcrw.com
-    mode="scrape",
-)
+# Cloud is the default — just set CRW_API_KEY and go
+loader = CrwLoader(url="https://example.com", mode="scrape")
 docs = loader.load()
 print(docs[0].page_content)  # clean markdown
 ```
 
-**Tip:** Set environment variables so you don't repeat args every time:
+### Option B: Self-hosted with binary (free, no limits)
+
+Single binary, ~15 MB download, ~6 MB idle RAM. No Docker needed.
 
 ```bash
-export CRW_API_URL=https://fastcrw.com/api
-export CRW_API_KEY=crw_live_...
+curl -fsSL https://raw.githubusercontent.com/us/crw/main/install.sh | bash
+crw  # starts on http://localhost:3000
 ```
 
 ```python
-# With env vars set, no constructor args needed
-loader = CrwLoader(url="https://example.com")
-docs = loader.load()
+loader = CrwLoader(url="https://example.com", api_url="http://localhost:3000")
 ```
 
-### Option B: Self-hosted (free, no limits)
-
-Run CRW on your own machine. No API key, no account, unlimited scraping.
+### Option C: Self-hosted with Docker
 
 ```bash
-# Install CRW (single binary, ~6 MB)
-curl -fsSL https://raw.githubusercontent.com/us/crw/main/install.sh | bash
-crw  # starts on http://localhost:3000
+docker run -d -p 3000:3000 ghcr.io/us/crw:latest
+```
 
-# Or use Docker
-docker run -p 3000:3000 ghcr.io/us/crw:latest
+```python
+loader = CrwLoader(url="https://example.com", api_url="http://localhost:3000")
 ```
 
 ```python

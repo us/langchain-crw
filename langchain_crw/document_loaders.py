@@ -89,7 +89,7 @@ class CrwLoader(BaseLoader):
         self.url = url
         self.api_key = api_key or os.getenv("CRW_API_KEY")
         self.api_url = (
-            api_url or os.getenv("CRW_API_URL") or "http://localhost:3000"
+            api_url or os.getenv("CRW_API_URL") or "https://fastcrw.com/api"
         ).rstrip("/")
         self.mode = mode
         self.params = params or {}
