@@ -14,54 +14,50 @@ pip install langchain-crw
 uv add langchain-crw
 ```
 
-## Setup — Pick One
+That's it. No server to install, no `cargo install`, no Docker. The `crw` SDK automatically downloads and manages the CRW binary for you.
 
-### Option A: Cloud ([fastcrw.com](https://fastcrw.com)) — Quickest Start
-
-No server to install. [Sign up at fastcrw.com](https://fastcrw.com) and get **500 free credits** to start scraping:
-
-```bash
-export CRW_API_KEY=crw_live_...  # get yours at fastcrw.com
-```
+## Quick Start — Zero Config (Subprocess Mode)
 
 ```python
 from langchain_crw import CrwLoader
 
-# Cloud is the default — just set CRW_API_KEY and go
+# Just works — crw SDK handles everything locally
 loader = CrwLoader(url="https://example.com", mode="scrape")
 docs = loader.load()
 print(docs[0].page_content)  # clean markdown
 ```
 
-### Option B: Self-hosted with binary (free, no limits)
+## Cloud Mode ([fastcrw.com](https://fastcrw.com))
 
-Single binary, ~15 MB download, ~6 MB idle RAM. No Docker needed.
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/us/crw/main/install.sh | bash
-crw  # starts on http://localhost:3000
-```
+No local binary needed. [Sign up at fastcrw.com](https://fastcrw.com) and get **500 free credits**:
 
 ```python
-loader = CrwLoader(url="https://example.com", api_url="http://localhost:3000")
+from langchain_crw import CrwLoader
+
+loader = CrwLoader(
+    url="https://example.com",
+    mode="scrape",
+    api_url="https://fastcrw.com/api",
+    api_key="crw_live_...",  # or set CRW_API_KEY env var
+)
+docs = loader.load()
 ```
 
-### Option C: Self-hosted with Docker
+## Advanced: Self-hosted Server
+
+If you prefer running a persistent CRW server (e.g., shared across services):
 
 ```bash
+# Option A: Install binary
+curl -fsSL https://raw.githubusercontent.com/us/crw/main/install.sh | bash
+crw  # starts on http://localhost:3000
+
+# Option B: Docker
 docker run -d -p 3000:3000 ghcr.io/us/crw:latest
 ```
 
 ```python
 loader = CrwLoader(url="https://example.com", api_url="http://localhost:3000")
-```
-
-```python
-from langchain_crw import CrwLoader
-
-# No api_key needed — auto-connects to localhost:3000
-loader = CrwLoader(url="https://example.com", mode="scrape")
-docs = loader.load()
 ```
 
 ## Usage
@@ -139,7 +135,7 @@ results = vectorstore.similarity_search("how to authenticate")
 |-----------|------|---------|-------------|
 | `url` | `str` | required | URL to scrape, crawl, or map |
 | `api_key` | `str \| None` | `None` | Bearer token. Falls back to `CRW_API_KEY` env var |
-| `api_url` | `str \| None` | `None` | CRW server URL. Falls back to `CRW_API_URL`, then `http://localhost:3000` |
+| `api_url` | `str \| None` | `None` | CRW server URL. Falls back to `CRW_API_URL`. If unset, uses subprocess mode (no server needed) |
 | `mode` | `"scrape" \| "crawl" \| "map"` | `"scrape"` | Operation mode |
 | `params` | `dict \| None` | `None` | Additional API parameters |
 
@@ -166,7 +162,7 @@ results = vectorstore.similarity_search("how to authenticate")
 from langchain_community.document_loaders import FireCrawlLoader
 loader = FireCrawlLoader(url="https://example.com", api_key="fc-...", mode="scrape")
 
-# After — similar interface, self-hosted, no SDK needed
+# After — pip install langchain-crw, zero config, no server needed
 from langchain_crw import CrwLoader
 loader = CrwLoader(url="https://example.com", mode="scrape")
 ```
