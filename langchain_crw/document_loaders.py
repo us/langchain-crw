@@ -57,27 +57,36 @@ class CrwLoader(BaseLoader):
 
     def __init__(
         self,
-        url: str,
+        url: str = "",
         *,
         api_key: Optional[str] = None,
         api_url: Optional[str] = None,
-        mode: Literal["scrape", "crawl", "map"] = "scrape",
+        mode: Literal["scrape", "crawl", "map", "search"] = "scrape",
+        query: Optional[str] = None,
         params: Optional[dict[str, Any]] = None,
     ) -> None:
         """Initialize CrwLoader.
 
         Args:
             url: The URL to scrape, crawl, or map.
+                Not required for search mode.
             api_key: Bearer token for authentication.
                 Read from CRW_API_KEY env var if not provided.
                 Not required for subprocess mode or self-hosted without auth.
             api_url: Base URL of CRW server for HTTP mode.
                 Read from CRW_API_URL env var if not provided.
                 Defaults to None (subprocess mode — spawns crw-mcp binary).
-            mode: Operation mode - "scrape", "crawl", or "map".
+            mode: Operation mode - "scrape", "crawl", "map", or "search".
+            query: Search query string. Required for search mode.
             params: Additional parameters passed to the CRW API.
         """
+        if mode == "search" and not query:
+            raise ValueError("query is required for search mode")
+        if mode != "search" and not url:
+            raise ValueError("url is required for scrape/crawl/map modes")
+
         self.url = url
+        self.query = query
         self.api_key = api_key or os.getenv("CRW_API_KEY")
         self.api_url = api_url or os.getenv("CRW_API_URL") or None
         self.mode = mode
@@ -95,7 +104,9 @@ class CrwLoader(BaseLoader):
 
     def lazy_load(self) -> Iterator[Document]:
         """Lazy load documents from CRW."""
-        if self.mode == "scrape":
+        if self.mode == "search":
+            yield from self._search()
+        elif self.mode == "scrape":
             yield from self._scrape()
         elif self.mode == "crawl":
             yield from self._crawl()
@@ -103,7 +114,7 @@ class CrwLoader(BaseLoader):
             yield from self._map()
         else:
             raise ValueError(
-                f"Invalid mode '{self.mode}'. Must be 'scrape', 'crawl', or 'map'."
+                f"Invalid mode '{self.mode}'. Must be 'scrape', 'crawl', 'map', or 'search'."
             )
 
     def _scrape(self) -> Iterator[Document]:
@@ -139,6 +150,40 @@ class CrwLoader(BaseLoader):
             doc = self._parse_document(page)
             if doc.page_content:
                 yield doc
+
+    def _search(self) -> Iterator[Document]:
+        """Search the web. Cloud-only feature."""
+        client = self._get_client()
+        kwargs = self._build_sdk_params()
+
+        results = client.search(self.query, **kwargs)
+
+        # Flat results: list of dicts
+        if isinstance(results, list):
+            for result in results:
+                yield Document(
+                    page_content=result.get("markdown") or result.get("description", ""),
+                    metadata={
+                        "url": result.get("url", ""),
+                        "title": result.get("title", ""),
+                        "score": result.get("score"),
+                        "source": "search",
+                    },
+                )
+        # Grouped results: dict with web/news/images keys
+        elif isinstance(results, dict):
+            for source_type, items in results.items():
+                if isinstance(items, list):
+                    for item in items:
+                        yield Document(
+                            page_content=item.get("markdown") or item.get("description", ""),
+                            metadata={
+                                "url": item.get("url", ""),
+                                "title": item.get("title", ""),
+                                "source_type": source_type,
+                                "source": "search",
+                            },
+                        )
 
     def _map(self) -> Iterator[Document]:
         """Discover URLs on a site."""

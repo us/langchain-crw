@@ -91,6 +91,27 @@ loader = CrwLoader(url="https://example.com", mode="map")
 urls = [doc.page_content for doc in loader.load()]
 ```
 
+### Search the web (Cloud Only)
+
+> **Cloud-only feature.** Search requires a fastcrw.com API key or a CRW server with SearXNG configured.
+
+```python
+from langchain_crw import CrwLoader
+
+loader = CrwLoader(
+    query="web scraping tools 2026",
+    mode="search",
+    api_url="https://fastcrw.com/api",
+    api_key="YOUR_KEY",
+    params={"limit": 5},
+)
+docs = loader.load()
+
+for doc in docs:
+    print(doc.metadata["title"], doc.metadata["url"])
+    print(doc.page_content[:200])
+```
+
 ### Scrape with JS rendering
 
 ```python
@@ -133,10 +154,11 @@ results = vectorstore.similarity_search("how to authenticate")
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `url` | `str` | required | URL to scrape, crawl, or map |
+| `url` | `str` | `""` | URL to scrape, crawl, or map. Not required for search mode |
 | `api_key` | `str \| None` | `None` | Bearer token. Falls back to `CRW_API_KEY` env var |
 | `api_url` | `str \| None` | `None` | CRW server URL. Falls back to `CRW_API_URL`. If unset, uses subprocess mode (no server needed) |
-| `mode` | `"scrape" \| "crawl" \| "map"` | `"scrape"` | Operation mode |
+| `mode` | `"scrape" \| "crawl" \| "map" \| "search"` | `"scrape"` | Operation mode |
+| `query` | `str \| None` | `None` | Search query string. Required for search mode |
 | `params` | `dict \| None` | `None` | Additional API parameters |
 
 ### Params (snake_case, auto-converted to camelCase)
@@ -155,7 +177,7 @@ results = vectorstore.similarity_search("how to authenticate")
 
 ## Migrating from FireCrawlLoader
 
-`CrwLoader` supports the same `scrape`, `crawl`, and `map` modes. Note that `CrwLoader` defaults to `mode="scrape"` while `FireCrawlLoader` defaults to `mode="crawl"` — set the mode explicitly when migrating.
+`CrwLoader` supports the same `scrape`, `crawl`, and `map` modes, plus a `search` mode. Note that `CrwLoader` defaults to `mode="scrape"` while `FireCrawlLoader` defaults to `mode="crawl"` — set the mode explicitly when migrating.
 
 ```python
 # Before
