@@ -93,7 +93,7 @@ urls = [doc.page_content for doc in loader.load()]
 
 ### Search the web (Cloud Only)
 
-> **Cloud-only feature.** Search requires a fastcrw.com API key or a CRW server with SearXNG configured.
+> **Cloud-only feature.** Search requires a fastcrw.com API key or a CRW server with search configured.
 
 ```python
 from langchain_crw import CrwLoader
