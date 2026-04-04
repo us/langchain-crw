@@ -31,6 +31,7 @@ class TestInit:
         loader = CrwLoader(url="https://example.com", api_key="test-key")
         assert loader.api_key == "test-key"
 
+    @patch.dict(os.environ, {}, clear=True)
     def test_no_api_key_is_none(self, mock_client):
         loader = CrwLoader(url="https://example.com")
         assert loader.api_key is None
@@ -98,6 +99,13 @@ class TestScrape:
         docs = list(loader.lazy_load())
         assert docs[0].page_content == "<h1>Hi</h1>"
 
+    def test_scrape_empty_string_content_yields_nothing(self, mock_client):
+        mock_client.scrape.return_value = {"markdown": "", "metadata": {}}
+
+        loader = CrwLoader(url="https://example.com", mode="scrape")
+        docs = list(loader.lazy_load())
+        assert docs == []
+
 
 class TestCrawl:
     def test_crawl_returns_documents(self, mock_client):
@@ -128,6 +136,21 @@ class TestCrawl:
         call_kwargs = mock_client.crawl.call_args
         assert call_kwargs[1]["poll_interval"] == 5
         assert call_kwargs[1]["timeout"] == 60
+
+    def test_poll_interval_clamped_to_minimum(self, mock_client):
+        mock_client.crawl.return_value = [
+            {"markdown": "# Done", "metadata": {}},
+        ]
+
+        loader = CrwLoader(
+            url="https://example.com",
+            mode="crawl",
+            params={"poll_interval": 0.0},
+        )
+        list(loader.lazy_load())
+
+        call_kwargs = mock_client.crawl.call_args
+        assert call_kwargs[1]["poll_interval"] == 0.1
 
     def test_crawl_failed(self, mock_client):
         from crw.exceptions import CrwError
@@ -189,6 +212,34 @@ class TestSearch:
         assert len(docs) == 1
         assert docs[0].metadata["title"] == "Result 1"
         assert docs[0].metadata["source"] == "search"
+        assert docs[0].page_content == "First"
+
+    def test_search_grouped_results(self, mock_client):
+        mock_client.search.return_value = {
+            "web": [
+                {"title": "Web Result", "url": "https://web.com", "description": "Web desc"},
+            ],
+            "news": [
+                {"title": "News Result", "url": "https://news.com", "description": "News desc"},
+                {"title": "News 2", "url": "https://news2.com", "markdown": "# Breaking"},
+            ],
+        }
+
+        loader = CrwLoader(
+            url="",
+            mode="search",
+            query="grouped query",
+            api_url="https://fastcrw.com/api",
+        )
+        docs = list(loader.lazy_load())
+
+        assert len(docs) == 3
+        assert docs[0].metadata["source_type"] == "web"
+        assert docs[0].metadata["source"] == "search"
+        assert docs[0].page_content == "Web desc"
+        assert docs[1].metadata["source_type"] == "news"
+        assert docs[1].page_content == "News desc"
+        assert docs[2].page_content == "# Breaking"
 
 
 class TestInterface:
@@ -217,3 +268,4 @@ class TestInterface:
         loader._get_client()
         loader.close()
         assert loader._client is None
+        mock_client.close.assert_called_once()
