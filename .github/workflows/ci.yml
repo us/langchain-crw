@@ -50,6 +50,6 @@ jobs:
         run: uv pip install pytest
 
       - name: Run integration tests
-        run: uv run python -m pytest tests/test_integration.py -v --timeout=120
+        run: uv run python -m pytest tests/test_integration.py -v
         env:
           CRW_API_KEY: ${{ secrets.CRW_API_KEY }}
