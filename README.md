@@ -49,7 +49,7 @@ If you prefer running a persistent CRW server (e.g., shared across services):
 
 ```bash
 # Option A: Install binary
-curl -fsSL https://raw.githubusercontent.com/us/crw/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/us/crw/main/install.sh | sh
 crw  # starts on http://localhost:3000
 
 # Option B: Docker

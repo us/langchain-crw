@@ -212,7 +212,7 @@ class CrwLoader(BaseLoader):
 
     def close(self) -> None:
         """Clean up the underlying CrwClient."""
-        if self._client is not None:
+        if getattr(self, "_client", None) is not None:
             self._client.close()
             self._client = None
 
