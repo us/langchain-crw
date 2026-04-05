@@ -8,7 +8,7 @@ and could be used for SSRF if exposed to untrusted input.
 from __future__ import annotations
 
 import os
-from typing import Any, Iterator, Literal, Optional
+from typing import Any, Iterator, Literal, Optional, Union
 
 from crw import CrwClient
 from langchain_core.document_loaders import BaseLoader
@@ -57,7 +57,7 @@ class CrwLoader(BaseLoader):
 
     def __init__(
         self,
-        url: str = "",
+        url: Union[str, list[str]] = "",
         *,
         api_key: Optional[str] = None,
         api_url: Optional[str] = None,
@@ -68,7 +68,7 @@ class CrwLoader(BaseLoader):
         """Initialize CrwLoader.
 
         Args:
-            url: The URL to scrape, crawl, or map.
+            url: The URL (or list of URLs) to scrape, crawl, or map.
                 Not required for search mode.
             api_key: Bearer token for authentication.
                 Read from CRW_API_KEY env var if not provided.
@@ -118,38 +118,39 @@ class CrwLoader(BaseLoader):
             )
 
     def _scrape(self) -> Iterator[Document]:
-        """Scrape a single URL."""
+        """Scrape one or more URLs."""
         client = self._get_client()
         kwargs = self._build_sdk_params()
-        result = client.scrape(self.url, **kwargs)
 
-        if not result:
-            return
-
-        doc = self._parse_document(result)
-        if doc.page_content:
-            yield doc
+        urls = [self.url] if isinstance(self.url, str) else self.url
+        for u in urls:
+            result = client.scrape(u, **kwargs)
+            if not result:
+                continue
+            doc = self._parse_document(result)
+            if doc.page_content:
+                yield doc
 
     def _crawl(self) -> Iterator[Document]:
-        """Crawl a site and yield documents."""
+        """Crawl one or more sites."""
         client = self._get_client()
         kwargs = self._build_sdk_params()
 
-        # Extract poll/timeout params
         poll_interval = max(self.params.get("poll_interval", 2.0), 0.1)
         timeout = max(self.params.get("timeout", 300.0), 0)
 
-        pages = client.crawl(
-            self.url,
-            poll_interval=poll_interval,
-            timeout=timeout,
-            **kwargs,
-        )
-
-        for page in pages:
-            doc = self._parse_document(page)
-            if doc.page_content:
-                yield doc
+        urls = [self.url] if isinstance(self.url, str) else self.url
+        for u in urls:
+            pages = client.crawl(
+                u,
+                poll_interval=poll_interval,
+                timeout=timeout,
+                **kwargs,
+            )
+            for page in pages:
+                doc = self._parse_document(page)
+                if doc.page_content:
+                    yield doc
 
     def _search(self) -> Iterator[Document]:
         """Search the web. Cloud-only feature."""
@@ -162,7 +163,8 @@ class CrwLoader(BaseLoader):
         if isinstance(results, list):
             for result in results:
                 yield Document(
-                    page_content=result.get("markdown") or result.get("description", ""),
+                    page_content=result.get("markdown")
+                    or result.get("description", ""),
                     metadata={
                         "url": result.get("url", ""),
                         "title": result.get("title", ""),
@@ -176,7 +178,8 @@ class CrwLoader(BaseLoader):
                 if isinstance(items, list):
                     for item in items:
                         yield Document(
-                            page_content=item.get("markdown") or item.get("description", ""),
+                            page_content=item.get("markdown")
+                            or item.get("description", ""),
                             metadata={
                                 "url": item.get("url", ""),
                                 "title": item.get("title", ""),
@@ -186,14 +189,16 @@ class CrwLoader(BaseLoader):
                         )
 
     def _map(self) -> Iterator[Document]:
-        """Discover URLs on a site."""
+        """Discover URLs on one or more sites."""
         client = self._get_client()
         kwargs = self._build_sdk_params()
-        links = client.map(self.url, **kwargs)
 
-        for link in links:
-            if isinstance(link, str) and link:
-                yield Document(page_content=link, metadata={})
+        urls = [self.url] if isinstance(self.url, str) else self.url
+        for u in urls:
+            links = client.map(u, **kwargs)
+            for link in links:
+                if isinstance(link, str) and link:
+                    yield Document(page_content=link, metadata={})
 
     def _build_sdk_params(self) -> dict[str, Any]:
         """Build keyword arguments for CrwClient methods.
