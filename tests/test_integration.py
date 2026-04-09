@@ -40,7 +40,6 @@ def test_scrape_real_url():
     assert len(docs[0].page_content) > 0
 
 
-@pytest.mark.xfail(reason="crw client crawl polling has a known bug with list response")
 def test_crawl_real_url():
     loader = CrwLoader(
         url="https://example.com",
@@ -71,7 +70,6 @@ def test_map_real_url():
     assert all("http" in d.page_content for d in docs)
 
 
-@pytest.mark.skip(reason="CrwClient does not yet expose a search() method")
 def test_search_real_query():
     loader = CrwLoader(
         url="",
