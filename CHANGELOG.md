@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/us/langchain-crw/compare/v0.4.0...v0.4.1) (2026-04-09)
+
+
+### Bug Fixes
+
+* bump crw&gt;=0.3.4, enable search and crawl integration tests ([b8f0cf9](https://github.com/us/langchain-crw/commit/b8f0cf97736061d362491e4d5b45affac3cd8ad6))
+
 ## [0.4.0](https://github.com/us/langchain-crw/compare/v0.3.0...v0.4.0) (2026-04-05)
 
 
