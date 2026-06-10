@@ -269,3 +269,42 @@ class TestInterface:
         loader.close()
         assert loader._client is None
         mock_client.close.assert_called_once()
+
+
+class TestParseMode:
+    def test_parse_loads_file(self, mock_client):
+        mock_client.parse_file.return_value = {
+            "markdown": "# Doc",
+            "metadata": {"numPages": 2},
+        }
+        loader = CrwLoader(url="/tmp/doc.pdf", mode="parse", params={"formats": ["markdown"]})
+        docs = loader.load()
+        assert len(docs) == 1
+        assert docs[0].page_content == "# Doc"
+        assert docs[0].metadata["numPages"] == 2
+        # path forwarded, plus only parse-relevant params
+        assert mock_client.parse_file.call_args[0][0] == "/tmp/doc.pdf"
+        assert mock_client.parse_file.call_args[1]["formats"] == ["markdown"]
+
+    def test_parse_requires_path(self, mock_client):
+        with pytest.raises(ValueError, match="url is required"):
+            CrwLoader(url="", mode="parse")
+
+
+class TestExtractMode:
+    def test_extract_yields_json_document(self, mock_client):
+        mock_client.extract.return_value = {"title": "Hello"}
+        loader = CrwLoader(
+            url="https://example.com",
+            mode="extract",
+            api_url="https://fastcrw.com/api",
+            query="Get the title",
+            params={"schema": {"type": "object"}},
+        )
+        docs = loader.load()
+        assert len(docs) == 1
+        assert '"title": "Hello"' in docs[0].page_content
+        assert docs[0].metadata["source"] == "extract"
+        # prompt comes from query, schema from params
+        assert mock_client.extract.call_args[1]["prompt"] == "Get the title"
+        assert mock_client.extract.call_args[1]["schema"] == {"type": "object"}
