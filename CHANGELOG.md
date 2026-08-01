@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.0](https://github.com/us/langchain-crw/compare/v0.4.0...v0.5.0) (2026-08-01)
+
+
+### Features
+
+* support LangChain 1.x by re-exporting the SDK loader ([a4a82bf](https://github.com/us/langchain-crw/commit/a4a82bf1bd0ebf986d3c411b1515bb39bca5e8fc))
+
+
+### Bug Fixes
+
+* bump crw&gt;=0.3.4, enable search and crawl integration tests ([b8f0cf9](https://github.com/us/langchain-crw/commit/b8f0cf97736061d362491e4d5b45affac3cd8ad6))
+
 ## [0.4.0](https://github.com/us/langchain-crw/compare/v0.3.0...v0.4.0) (2026-04-05)
 
 
