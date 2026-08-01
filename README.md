@@ -4,7 +4,7 @@
 [![Python](https://img.shields.io/pypi/pyversions/langchain-crw)](https://pypi.org/project/langchain-crw/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-LangChain document loader for [CRW](https://github.com/us/crw) — a high-performance, Firecrawl-compatible web scraper written in Rust.
+LangChain document loader for [CRW](https://github.com/us/crw), a high-performance, Firecrawl-compatible web scraper written in Rust.
 
 ## Installation
 
@@ -14,43 +14,52 @@ pip install langchain-crw
 uv add langchain-crw
 ```
 
-That's it. No server to install, no `cargo install`, no Docker. The `crw` SDK automatically downloads and manages the CRW binary for you.
+This package re-exports the loader from the `crw` SDK, so `pip install 'crw[langchain]'` gives you the identical `CrwLoader`. Use whichever name fits your dependency list.
 
-## Quick Start — Zero Config (Subprocess Mode)
+## Quick Start (Cloud)
+
+CRW is cloud-first. [Sign up at fastcrw.com](https://fastcrw.com/dashboard) for **500 free credits** (no card, one time, never expires) and set `CRW_API_KEY`:
+
+```bash
+export CRW_API_KEY="crw_live_..."
+```
 
 ```python
 from langchain_crw import CrwLoader
 
-# Just works — crw SDK handles everything locally
 loader = CrwLoader(url="https://example.com", mode="scrape")
 docs = loader.load()
 print(docs[0].page_content)  # clean markdown
 ```
 
-## Cloud Mode ([fastcrw.com](https://fastcrw.com))
-
-No local binary needed. [Sign up at fastcrw.com](https://fastcrw.com) and get **500 free credits**:
+You can also pass the key directly:
 
 ```python
-from langchain_crw import CrwLoader
-
-loader = CrwLoader(
-    url="https://example.com",
-    mode="scrape",
-    api_url="https://fastcrw.com/api",
-    api_key="crw_live_...",  # or set CRW_API_KEY env var
-)
-docs = loader.load()
+loader = CrwLoader(url="https://example.com", api_key="crw_live_...")
 ```
 
-## Advanced: Self-hosted Server
+## Local Engine (no key, no server)
 
-If you prefer running a persistent CRW server (e.g., shared across services):
+Set `CRW_LOCAL=1` and the SDK downloads and manages a checksum-verified CRW binary for you, then talks to it over a subprocess. No account and no server to run, and your URLs and scraped content never reach fastCRW (the engine still fetches the pages it scrapes):
 
 ```bash
-# Option A: Install binary
-curl -fsSL https://raw.githubusercontent.com/us/crw/main/install.sh | sh
-crw  # starts on http://localhost:3000
+export CRW_LOCAL=1
+```
+
+```python
+loader = CrwLoader(url="https://example.com", mode="scrape")  # same code
+```
+
+`CRW_LOCAL=1` takes precedence over `api_url`. If both are set the local engine wins and `api_url` is ignored.
+
+## Self-hosted Server
+
+If you would rather run a persistent CRW server, shared across services:
+
+```bash
+# Option A: Install the binary
+curl -fsSL https://fastcrw.com/install | sh
+crw serve  # listens on http://localhost:3000
 
 # Option B: Docker
 docker run -d -p 3000:3000 ghcr.io/us/crw:latest
@@ -91,18 +100,14 @@ loader = CrwLoader(url="https://example.com", mode="map")
 urls = [doc.page_content for doc in loader.load()]
 ```
 
-### Search the web (Cloud Only)
+### Search the web
 
-> **Cloud-only feature.** Search requires a fastcrw.com API key or a CRW server with search configured.
+Search needs a backend: the managed cloud provides one, and a self-hosted server needs one configured.
 
 ```python
-from langchain_crw import CrwLoader
-
 loader = CrwLoader(
     query="web scraping tools 2026",
     mode="search",
-    api_url="https://fastcrw.com/api",
-    api_key="YOUR_KEY",
     params={"limit": 5},
 )
 docs = loader.load()
@@ -111,6 +116,33 @@ for doc in docs:
     print(doc.metadata["title"], doc.metadata["url"])
     print(doc.page_content[:200])
 ```
+
+### Parse a local PDF
+
+`parse` mode takes a local file path in `url` rather than a web address.
+
+```python
+loader = CrwLoader(url="report.pdf", mode="parse")
+docs = loader.load()
+```
+
+`params` may carry `formats`, `json_schema`, and `parsers`.
+
+### Structured extraction
+
+`extract` mode runs LLM extraction across one or more URLs. `query` is the prompt and `params["schema"]` is the JSON Schema. Requires cloud or a server, not the local engine.
+
+```python
+loader = CrwLoader(
+    url=["https://example.com/pricing"],
+    mode="extract",
+    query="Extract the plan names and monthly prices",
+    params={"schema": {"type": "object", "properties": {"plans": {"type": "array"}}}},
+)
+docs = loader.load()  # page_content is JSON, metadata carries url, status, error
+```
+
+Optional `params`: `llm_api_key`, `llm_provider`, `llm_model`.
 
 ### Scrape with JS rendering
 
@@ -135,7 +167,7 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-# Crawl docs (self-hosted or cloud — same code)
+# Crawl docs. Cloud, local engine, and self-hosted all run the same code.
 loader = CrwLoader(url="https://docs.example.com", mode="crawl", params={"max_depth": 3, "max_pages": 50})
 docs = loader.load()
 
@@ -154,14 +186,16 @@ results = vectorstore.similarity_search("how to authenticate")
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `url` | `str` | `""` | URL to scrape, crawl, or map. Not required for search mode |
-| `api_key` | `str \| None` | `None` | Bearer token. Falls back to `CRW_API_KEY` env var |
-| `api_url` | `str \| None` | `None` | CRW server URL. Falls back to `CRW_API_URL`. If unset, uses subprocess mode (no server needed) |
-| `mode` | `"scrape" \| "crawl" \| "map" \| "search"` | `"scrape"` | Operation mode |
-| `query` | `str \| None` | `None` | Search query string. Required for search mode |
-| `params` | `dict \| None` | `None` | Additional API parameters |
+| `url` | `str \| list[str]` | `""` | URL to scrape, crawl, map, or extract from. A local file path in `parse` mode. Not required for `search` |
+| `api_key` | `str \| None` | `None` | Bearer token. Falls back to `CRW_API_KEY`. Not needed with `CRW_LOCAL=1` or an unauthenticated self-hosted server |
+| `api_url` | `str \| None` | `None` | CRW server URL. Falls back to `CRW_API_URL`. If unset, the managed cloud at `api.fastcrw.com` is used. Ignored when `CRW_LOCAL=1` |
+| `mode` | `"scrape" \| "crawl" \| "map" \| "search" \| "parse" \| "extract"` | `"scrape"` | Operation mode |
+| `query` | `str \| None` | `None` | Search query in `search` mode, extraction prompt in `extract` mode |
+| `params` | `dict \| None` | `None` | Additional parameters, forwarded to the SDK |
 
-### Params (snake_case, auto-converted to camelCase)
+### Params
+
+Named parameters are translated to the API's camelCase. Anything else is forwarded verbatim, so you can pass API fields directly.
 
 | Param | Modes | Description |
 |-------|-------|-------------|
@@ -174,17 +208,19 @@ results = vectorstore.similarity_search("how to authenticate")
 | `use_sitemap` | map | Use sitemap for URL discovery |
 | `poll_interval` | crawl | Poll interval in seconds (default: 2) |
 | `timeout` | crawl | Crawl timeout in seconds (default: 300) |
+| `schema` | extract | JSON Schema for the extracted object |
+| `formats`, `json_schema`, `parsers` | parse | PDF parsing options |
 
 ## Migrating from FireCrawlLoader
 
-`CrwLoader` supports the same `scrape`, `crawl`, and `map` modes, plus a `search` mode. Note that `CrwLoader` defaults to `mode="scrape"` while `FireCrawlLoader` defaults to `mode="crawl"` — set the mode explicitly when migrating.
+`CrwLoader` supports the same `scrape`, `crawl`, and `map` modes, plus `search`, `parse`, and `extract`. Note that `CrwLoader` defaults to `mode="scrape"` while `FireCrawlLoader` defaults to `mode="crawl"`, so set the mode explicitly when migrating.
 
 ```python
 # Before
 from langchain_community.document_loaders import FireCrawlLoader
 loader = FireCrawlLoader(url="https://example.com", api_key="fc-...", mode="scrape")
 
-# After — pip install langchain-crw, zero config, no server needed
+# After
 from langchain_crw import CrwLoader
 loader = CrwLoader(url="https://example.com", mode="scrape")
 ```

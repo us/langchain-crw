@@ -5,13 +5,20 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # This repo goes quiet for months at a time, so a push-only trigger gives no
+  # signal when the ecosystem moves underneath it. GitHub disables cron in repos
+  # idle for 60 days, so the load-bearing weekly check lives in crw-opencore's
+  # examples-test.yml; this one is a convenience.
+  schedule:
+    - cron: "17 7 * * 1"
+  workflow_dispatch: {}
 
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
 
     steps:
       - uses: actions/checkout@v4
@@ -31,9 +38,59 @@ jobs:
       - name: Run tests
         run: uv run python -m pytest tests/ -v -m "not integration"
 
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      # Pinned: an unpinned ruff turns unrelated PRs red when it adds a rule.
+      - run: uvx ruff@0.14.4 check .
+
+  # Guards the failure this package actually shipped: it resolved fine on its own
+  # but became uninstallable next to current LangChain. No unit test can catch
+  # that, only a real resolution, so both ends of the supported langchain-core
+  # range get installed for real.
+  #
+  # `uv pip` into an explicit venv on purpose: `uv run` re-syncs from uv.lock and
+  # would silently undo the install being tested.
+  langchain-range:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Both declared floors together, and both latests together.
+          - name: floor
+            langchain: "langchain-core==0.3.0"
+            crw: "crw[langchain]==0.28.0"
+            expect: "0.3.0"
+          - name: latest
+            langchain: "langchain>=1,<2"
+            crw: "crw[langchain]"
+            expect: "1."
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv venv --python 3.13
+      - name: Install against ${{ matrix.name }} versions
+        run: uv pip install . "${{ matrix.langchain }}" "${{ matrix.crw }}" pytest
+      - name: Assert what actually resolved
+        run: |
+          ./.venv/bin/python -c "
+          import langchain_crw
+          from importlib.metadata import version
+          core, sdk = version('langchain-core'), version('crw')
+          print(f'langchain-core={core} crw={sdk} at {langchain_crw.__file__}')
+          assert core.startswith('${{ matrix.expect }}'), core
+          # Exercise the installed distribution, not the source tree next to it.
+          assert '.venv' in langchain_crw.__file__, langchain_crw.__file__
+          "
+      - name: Run tests against the installed distribution
+        run: cd tests && ../.venv/bin/python -m pytest . -v -m "not integration"
+
   integration:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     steps:
       - uses: actions/checkout@v4
 

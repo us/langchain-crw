@@ -1,18 +1,17 @@
 """Tests for CrwLoader with mocked CrwClient."""
 
 import os
-from typing import Iterator
+from collections.abc import Iterator
 from unittest.mock import MagicMock, patch
 
 import pytest
-from langchain_core.documents import Document
 
 from langchain_crw import CrwLoader
 
 
 @pytest.fixture
 def mock_client():
-    with patch("langchain_crw.document_loaders.CrwClient") as mock_cls:
+    with patch("crw.integrations.langchain.CrwClient") as mock_cls:
         client = MagicMock()
         mock_cls.return_value = client
         yield client
@@ -111,7 +110,10 @@ class TestCrawl:
     def test_crawl_returns_documents(self, mock_client):
         mock_client.crawl.return_value = [
             {"markdown": "# Page 1", "metadata": {"sourceURL": "https://example.com"}},
-            {"markdown": "# Page 2", "metadata": {"sourceURL": "https://example.com/about"}},
+            {
+                "markdown": "# Page 2",
+                "metadata": {"sourceURL": "https://example.com/about"},
+            },
         ]
 
         loader = CrwLoader(url="https://example.com", mode="crawl")
@@ -217,11 +219,23 @@ class TestSearch:
     def test_search_grouped_results(self, mock_client):
         mock_client.search.return_value = {
             "web": [
-                {"title": "Web Result", "url": "https://web.com", "description": "Web desc"},
+                {
+                    "title": "Web Result",
+                    "url": "https://web.com",
+                    "description": "Web desc",
+                },
             ],
             "news": [
-                {"title": "News Result", "url": "https://news.com", "description": "News desc"},
-                {"title": "News 2", "url": "https://news2.com", "markdown": "# Breaking"},
+                {
+                    "title": "News Result",
+                    "url": "https://news.com",
+                    "description": "News desc",
+                },
+                {
+                    "title": "News 2",
+                    "url": "https://news2.com",
+                    "markdown": "# Breaking",
+                },
             ],
         }
 
@@ -269,3 +283,28 @@ class TestInterface:
         loader.close()
         assert loader._client is None
         mock_client.close.assert_called_once()
+
+
+class TestReExport:
+    """The loader must stay a re-export of the SDK implementation.
+
+    If someone re-forks the code back into this package, these fail loudly
+    instead of letting the two copies drift apart again.
+    """
+
+    def test_is_the_sdk_loader(self):
+        from crw.integrations.langchain import CrwLoader as SdkLoader
+
+        assert CrwLoader is SdkLoader
+
+    def test_both_import_paths_agree(self):
+        from langchain_crw import CrwLoader as FromPackage
+        from langchain_crw.document_loaders import CrwLoader as FromModule
+
+        assert FromPackage is FromModule
+
+    def test_client_is_not_re_exported(self):
+        """Patching it here would silently no-op, so it must not exist."""
+        import langchain_crw.document_loaders as mod
+
+        assert not hasattr(mod, "CrwClient")
