@@ -74,19 +74,20 @@ jobs:
       - run: uv venv --python 3.13
       - name: Install against ${{ matrix.name }} versions
         run: uv pip install . "${{ matrix.langchain }}" "${{ matrix.crw }}" pytest
+      # -P keeps the checkout out of sys.path, so this exercises the installed
+      # distribution rather than the source tree sitting in the working dir.
       - name: Assert what actually resolved
         run: |
-          ./.venv/bin/python -c "
+          ./.venv/bin/python -P -c "
           import langchain_crw
           from importlib.metadata import version
           core, sdk = version('langchain-core'), version('crw')
           print(f'langchain-core={core} crw={sdk} at {langchain_crw.__file__}')
           assert core.startswith('${{ matrix.expect }}'), core
-          # Exercise the installed distribution, not the source tree next to it.
           assert '.venv' in langchain_crw.__file__, langchain_crw.__file__
           "
       - name: Run tests against the installed distribution
-        run: cd tests && ../.venv/bin/python -m pytest . -v -m "not integration"
+        run: ./.venv/bin/python -P -m pytest tests/ -v -m "not integration"
 
   integration:
     runs-on: ubuntu-latest
