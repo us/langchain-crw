@@ -20,11 +20,22 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    "langchain-core>=0.3.0,<1.0.0",
-    "crw>=0.3.4",
+    # The loader implementation and the langchain-core constraint both come from
+    # the SDK extra, so there is one place to keep current. 0.28.0 is the floor
+    # verified end to end.
+    #
+    # The upper bound is <2.0.0, not <1.0.0, on purpose. A <1.0.0 cap would
+    # recreate exactly the bug this package just shipped: the day crw 1.0 lands,
+    # `pip install langchain-crw crw>=1.0` becomes unsatisfiable and nothing
+    # notices. The opposite risk, crw 1.0 moving crw.integrations.langchain, is
+    # caught within a week by the downstream-langchain-crw job in crw-opencore,
+    # which installs the published package and asserts the re-export identity.
+    # A caught import error beats a silent resolution deadlock.
+    "crw[langchain]>=0.28.0,<2.0.0",
 ]
 
 [project.urls]
